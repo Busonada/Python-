@@ -1,0 +1,407 @@
+import tkinter as tk #import knižníc
+from tkinter import ttk
+from PIL import ImageTk
+import os
+import cv2
+import numpy
+import numpy as np 
+from PIL import Image, ImageDraw, ImageFont
+from tkinter import filedialog, messagebox
+#%%
+# čo program spustí po stlačeni butoma Image 
+def open_image_options_window():
+    # Vytvorí nové okno na existujúcom hlavnom okne
+    image_options_window = tk.Toplevel()
+    image_options_window.title("Image Options") #názov
+    
+    # funkcia na otvorenie prieskumníka súborov a výber obrázka
+    def open_file_explorer():
+        global img_path, img_extension  # Deklaruje img_path a img_extension ako globálne premenné
+        # Otvorí dialógové okno Windowsu na výber súboru, filtruje typy súborov
+        img_path = filedialog.askopenfilename(initialdir="/Desktop/Semestrálka", 
+                                    filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        img_extension = os.path.splitext(img_path)[1]  # Získa príponu súboru
+        file_path_label.config(text=img_path)  # Aktualizuje textový popisok na zobrazovanie cesty k vybranému súboru.
+    # Vytvorí tlačidlo pre výber obrázka, ktoré vyvolá funkciu
+    select_image_button = ttk.Button(image_options_window, text="Select Image", command=open_file_explorer)
+    select_image_button.grid(row=0, column=0, padx=10, pady=10)
+    
+    # Popisok na zobrazenie cesty k vybranému súboru a ukazje predvolbu že nie je zvolený
+    file_path_label = ttk.Label(image_options_window, text="No file selected")
+    file_path_label.grid(row=1, column=0, padx=10, pady=10)
+    
+    # Rozbaľovacie menu pre výber veľkosti obrázka
+    size_options = ["Small 400x200", "Medium 600x300", "Large 800x450", "Extra Large 1000x550"]
+    size_var = tk.StringVar(value="Medium 600x300")  # default hodota
+    size_dropdown = ttk.Combobox(image_options_window, textvariable=size_var, values=size_options)
+    size_dropdown.grid(row=2, column=0, padx=10, pady=10)
+    
+    # Čo sa spustí po potvrdení buttoma, zobrazenie obrázka v novom okne
+    def submit_and_show_image():
+        # Priradenie veľkostí obrázkov pre rýchle vyhľadávanie podľa názvu
+        size_dict = {
+            "Small 400x200": (400, 200),
+            "Medium 600x300": (600, 300),
+            "Large 800x450": (800, 450),
+            "Extra Large 1000x550": (1000, 550)
+        }
+        # Získanie vybranej veľkosti z rozbaľovacieho menu
+        selected_size = size_dict[size_var.get()]
+        
+        # Načítanie obrázka, zmena podľa zvolenej veľkosti
+        img = Image.open(img_path) #načítanie obrázka zo súboru
+        img.thumbnail(selected_size) #obrazok dostane velkosť aku sme zadali 
+        img_tk = ImageTk.PhotoImage(img) #Preforamátovanie obrázka na TKinter
+        
+        #nové okno na zobrazenie obrázka
+        display_window = tk.Toplevel()
+        display_window.title("Display Image")
+        image_label = ttk.Label(display_window, image=img_tk)
+        image_label.image = img_tk  # uloženie hodnoty udržanie referencie
+        image_label.pack(padx=10, pady=10)
+    
+        # Tlačidlo na odoslanie a zobrazenie obrázka
+        button_frame = ttk.Frame(display_window)
+        button_frame.pack(pady=20)
+    
+        # Function to apply the Bilateral Filter
+        def bilateral_filter():
+            def apply_filter(): #skúšal som funguje vnorená funkcia 
+                try:
+                    d_value = int(d_entry.get())  # zadavame hodnotu D
+                except ValueError:
+                    # Kontroluje či sme zadai číslo 
+                    d_entry.delete(0, tk.END)
+                    d_entry.insert(0, "Invalid input! Use integers.") #error
+                    return
+                    
+                image_array = np.array(img)  # Konvertuje obrázok z formátu PIL na NumPy pole
+                image_filtered = cv2.bilateralFilter(image_array, d=d_value, sigmaColor=75, sigmaSpace=75) #Aplikácia bilaterafiltera
+                image_filtered = Image.fromarray(image_filtered)  # onvertuje upravené NumPy pole späť na obrázok PIL
+                image_filtered.thumbnail(selected_size) #Ponechá velkosť aku sme dali na začiatku 
+                filtered_img_tk = ImageTk.PhotoImage(image_filtered) #obrázok PIL na formát vhodný pre zobrazenie v Tkinter
+                
+                # okno pre zobrazenie filtrovaného obrázka
+                filtered_display_window = tk.Toplevel() #nove okno a názov
+                filtered_display_window.title("Filtered Image")
+                filtered_image_label = ttk.Label(filtered_display_window, image=filtered_img_tk) #Vytvorí popisok v novom okne, ktorý obsahuje obrázok 
+                filtered_image_label.image = filtered_img_tk  #udržanie refernecie 
+                filtered_image_label.pack(padx=10, pady=10) #okraje
+                
+                # Save a Close Buttons tlačidlá umožňujú užívateľovi uložiť upravený obrázok
+                def save_image():
+                    save_filename = filedialog.asksaveasfilename(initialdir="/Desktop/Semestrálka/images",
+                                                                  defaultextension=img_extension,
+                                                                  filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+                    if save_filename:
+                        image_filtered.save(save_filename)
+                        messagebox.showinfo("Save Image", "Image saved successfully!")
+                    else:
+                        messagebox.showinfo("Save Image", "Save cancelled.")
+                
+                def close_filtered_display():
+                    filtered_display_window.destroy()
+                
+                #Buttomy
+                save_button = ttk.Button(filtered_display_window, text="Save", command=save_image)
+                save_button.pack(side=tk.LEFT, padx=10, pady=10)
+                
+                close_button = ttk.Button(filtered_display_window, text="Close", command=close_filtered_display)
+                close_button.pack(side=tk.LEFT, padx=10, pady=10)
+                
+                filter_window.destroy()  # Zavretie okna
+    
+            # Okno na zadvanie D a otvorenie okna s upraveným obrázkom 
+            filter_window = tk.Toplevel()
+            filter_window.title("Set Bilateral Filter d Value")
+            ttk.Label(filter_window, text="Enter d value:").pack(padx=10, pady=10)
+            d_entry = ttk.Entry(filter_window)
+            d_entry.pack(padx=10, pady=10)
+            apply_button = ttk.Button(filter_window, text="Apply Filter", command=apply_filter)
+            apply_button.pack(pady=10)
+    
+        def watermark():
+            if not img_path: #Skontroluje, či bola cesta k obrázku
+                messagebox.showinfo("Error", "No image selected")
+                return
+            
+            # otvorý obrázok
+            img = Image.open(img_path)
+        
+            # Otvorenie okna
+            watermark_window = tk.Toplevel()
+            watermark_window.title("Watermark Preview")
+        
+            # velkosť obrázka podla toho ako sme zadli na začiatku
+            img.thumbnail(selected_size)
+        
+            # Vytvorí objekt Draw, ktorý umožňuje kresliť na obrázok
+            draw = ImageDraw.Draw(img)
+        
+            # Určuje veľkosť písma ako približne desatinu šírky obrázka
+            font_size = img.width // 10
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)  # Pokúša sa načítať TrueType font "arial.ttf" s danou veľkosťou písma
+            except IOError:
+                font = ImageFont.load_default()  # Načíta predvolený font, ak sa TrueType font nepodarí načítať
+        
+            watermark_text = "J.R.R. Tolkien"  # Definuje text vodoznaku
+        
+            # určuje stredové koordináty obrázka pre umiestnenie textu
+            x = img.width / 2
+            y = img.height / 2
+        
+            # Nakreslí text vodoznaku na stred obrázka, s červenou farbou a zarovnaním na stred 
+            draw.text((x, y), watermark_text, font=font, fill="red", anchor="mm")  
+        
+            # Konvertuje obrázok PIL na formát PhotoImage pre Tkinter
+            img_tk = ImageTk.PhotoImage(img)
+        
+            # Display the image
+            label = tk.Label(watermark_window, image=img_tk)
+            label.image = img_tk  # Keep a reference!
+            label.pack() #Umiestnenie v okne
+            
+            button_frame = tk.Frame(watermark_window)
+            button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+            
+            # Save a Close Buttons tlačidlá umožňujú užívateľovi uložiť upravený obrázok
+            def save_watermark():
+                 save_filename = filedialog.asksaveasfilename(initialdir="/Desktop/Semestrálka/images",
+                                                               defaultextension=img_extension,
+                                                               filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+                 if save_filename:
+                     img.save(save_filename)
+                     messagebox.showinfo("Save Image", "Image saved successfully!")
+                 else:
+                     messagebox.showinfo("Save Image", "Save cancelled.")
+             
+            # Save button 
+            save_button = ttk.Button(button_frame, text="Save", command=save_watermark)
+            save_button.pack(side=tk.LEFT, padx=10)
+        
+            # Close button
+            close_button = ttk.Button(button_frame, text="Close", command=watermark_window.destroy)
+            close_button.pack(side=tk.LEFT)
+            #histogram 
+        def histogram():
+            #Ak neexistuje cesta k obrázku zobrazí sa chybové hlásenie a funkcia sa ukončí
+            if not img_path:
+                messagebox.showinfo("Error", "No image selected")
+                return
+        
+            # Otvorí obrázok
+            img = Image.open(img_path)
+            
+            # brázok sa prevedie na RGB formát a uloží do NumPy poľa pre OopenCV
+            img_cv = np.array(img.convert('RGB'))  
+        
+            # RGB obrázok sa rozdelí na jednotlivé farebné kanály
+            b, g, r = cv2.split(img_cv)
+        
+            # Na každý farebný kanál sa nezávisle aplikuje histogramová ekvalizácia, čo zlepšuje kontrast obrázka.
+            b_equalized = cv2.equalizeHist(b)
+            g_equalized = cv2.equalizeHist(g)
+            r_equalized = cv2.equalizeHist(r)
+        
+            # o upravení sa farebné kanály zase spoja do jedného obrázka.
+            equalized_image = cv2.merge((b_equalized, g_equalized, r_equalized))
+            
+            # Upravený obrázok sa konvertuje späť na formát PIL
+            equalized_image_pil = Image.fromarray(equalized_image)
+        
+            # Velkosť aku sem zadali na začiatku
+            equalized_image_pil.thumbnail(selected_size)
+        
+            # PIL obrázok sa prevedie na formát, ktorý možno použiť v Tkinter
+            equalized_img_tk = ImageTk.PhotoImage(equalized_image_pil)
+            
+            # vytvorí sa nové okno, v ktorom sa zobrazí upravený obrázok
+            equalized_display_window = tk.Toplevel()
+            equalized_display_window.title("Equalized Image")
+            equalized_image_label = ttk.Label(equalized_display_window, image=equalized_img_tk)
+            equalized_image_label.image = equalized_img_tk  # loženie referencie
+            equalized_image_label.pack(padx=10, pady=10)
+            
+            # Save a Close Buttons
+            def save_equalized_image():
+                save_filename = filedialog.asksaveasfilename(initialdir="/Desktop/Semestrálka/images",
+                                                             defaultextension=img_extension,
+                                                             filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+                if save_filename:
+                    equalized_image_pil.save(save_filename)
+                    messagebox.showinfo("Save Image", "Image saved successfully!")
+                else:
+                    messagebox.showinfo("Save Image", "Save cancelled.")
+            #Buttomy
+            save_button = ttk.Button(equalized_display_window, text="Save", command=save_equalized_image)
+            save_button.pack(side=tk.LEFT, padx=10, pady=10)
+        
+            close_button = ttk.Button(equalized_display_window, text="Close", command=equalized_display_window.destroy)
+            close_button.pack(side=tk.LEFT, padx=10, pady=10)
+    
+        def close_display_window():
+            display_window.destroy()
+        #Buttomy
+        bilateral_button = ttk.Button(button_frame, text="BilateralFilter", command=bilateral_filter)
+        bilateral_button.pack(side=tk.LEFT, padx=5)
+    
+        watermark_button = ttk.Button(button_frame, text="Watermark", command=watermark)
+        watermark_button.pack(side=tk.LEFT, padx=5)
+    
+        histogram_button = ttk.Button(button_frame, text="Histogram", command=histogram)
+        histogram_button.pack(side=tk.LEFT, padx=5)
+    
+        close_button = ttk.Button(button_frame, text="Close", command=close_display_window)
+        close_button.pack(side=tk.LEFT, padx=5)
+    
+    submit_button = ttk.Button(image_options_window, text="Submit", command=submit_and_show_image)
+    submit_button.grid(row=3, column=0, padx=10, pady=10)
+
+#%%   
+def slideshow_command():
+    # Funkcia na zobrazenie thumbnails v novom okne
+    
+    # Vytvorenie nového okna pre slideshow
+    slideshow_window = tk.Toplevel()
+    slideshow_window.title("Slideshow")
+
+    # Adresár s obrázkami
+    image_dir = "images/"
+
+    # Získanie zoznamu súborov v adresári
+    image_files = [file for file in os.listdir(image_dir) if file.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+    # Inicializácia indexu pre zobrazenie obrázkov viaže k matici ktoru sme si vytvorili z obrázkov 
+    current_index = 0
+    playing = True
+
+    # Funkcia pre zmenu obrázka na základe delta. Delta je parameter, ktorý indikuje, o koľko obrázkov sa 
+    # má posunúť vpred (ak je kladný) alebo vzad (ak je záporný)
+    def change_image(delta): 
+        nonlocal current_index  # udava nám na akom mieste sa práve nachádzame 
+        current_index = (current_index + delta) % len(image_files)  #Tu sa mení aktuálny index obrázka, ak delta je kladné, posunieme sa dopredu v zozname obrázkov, a ak je záporné, posunieme sa dozadu(cyklenie)
+        img_path = os.path.join(image_dir, image_files[current_index]) #Vytvára cestu k novému zobrazovanému obrázku z priečinku kde su uložené 
+        img = Image.open(img_path)
+        img.thumbnail((600, 500))  # Zmena veľkosti obrázka na slideshow
+        img_tk = ImageTk.PhotoImage(img) #Prevádza objekt obrázka na formát, ktorý môže byť zobrazený v rozhraní Tkinter.
+        image_label.config(image=img_tk) #Nastaví nový obrázok ako zobrazený obrázok v labeli
+        image_label.image = img_tk #uloži obrazok aby sa nevymazal z pamäte 
+
+    # Funkcia pre spustenie alebo zastavenie prehrávania
+    def toggle_playback():
+        nonlocal playing
+        playing = not playing
+        if playing:
+            play_stop_button.config(text="Stop")
+            play_slideshow()
+        else:
+            play_stop_button.config(text="Play")
+
+    # Funkcia pre prehrávanie slideshow
+    def play_slideshow():
+        if playing:
+            change_image(1)
+            slideshow_window.after(2000, play_slideshow)
+
+    # Zobrazenie prvých obrázkov
+    img_path = os.path.join(image_dir, image_files[current_index]) #zobrazhuje obrázok podla indexu 
+    img = Image.open(img_path) #otvorí obrázok 
+    img.thumbnail((400, 300))  # Zmena veľkosti obrázka na slideshow
+    img_tk = ImageTk.PhotoImage(img)  #Prevádza objekt obrázka na formát, ktorý môže byť zobrazený v rozhraní Tkinter.
+    image_label = ttk.Label(slideshow_window, image=img_tk)  #určuje ktorý obrázok bude v labeli 
+    image_label.pack(padx=10, pady=10) #budeme mať okraje okolo obrázka 
+
+    # Tlačidlá pre zmenu obrázkov
+    prev_button = ttk.Button(slideshow_window, text="Previous", command=lambda: change_image(-1)) #ako bolo vyšie meníme index obrazku kde sa nachadzame 
+    prev_button.pack(side=tk.LEFT, padx=5)
+    next_button = ttk.Button(slideshow_window, text="Next", command=lambda: change_image(1))
+    next_button.pack(side=tk.RIGHT, padx=5)
+
+    # Tlačidlo pre spustenie/zastavenie prehrávania
+    play_stop_button = ttk.Button(slideshow_window, text="Stop", command=toggle_playback)
+    play_stop_button.pack(pady=5)
+
+    # Spustenie prehrávania
+    play_slideshow()
+
+#%% 
+def thumbnails_command():
+    print("Thumbnails funguje!")
+    # Vytvorenie nového okna
+    thumbnails_window = tk.Toplevel()
+    thumbnails_window.title("Thumbnails")
+
+    # Adresár s obrázkami
+    image_dir = "images/"
+
+    def display_thumbnails(file_extensions):
+        # Create a new window for displaying thumbnails
+        specific_type_window = tk.Toplevel()
+        specific_type_window.title("All Image Types Thumbnails")
+
+        row = 0
+        col = 0
+        for filename in os.listdir(image_dir):
+            if any(filename.endswith(ext) for ext in file_extensions):  # Check against multiple extensions
+                # Načítanie obrázka
+                image_path = os.path.join(image_dir, filename)
+                image = Image.open(image_path)
+                image.thumbnail((200, 150))
+
+                # Prevod na formát pre Tkinter
+                image_tk = ImageTk.PhotoImage(image)
+
+                # Vytvorenie labelu s thumbnailom a jeho zobrazenie
+                thumbnail_label = ttk.Label(specific_type_window, image=image_tk)
+                thumbnail_label.image = image_tk  # Uchová odkaz na obrázok
+                thumbnail_label.grid(row=row, column=col, padx=5, pady=5)
+
+                # Zobrazenie názvu obrázka pod thumbnailom
+                image_name_label = ttk.Label(specific_type_window, text=filename)
+                image_name_label.grid(row=row + 1, column=col, padx=5, pady=5)
+
+                # Aktualizácia riadku a stĺpca
+                col += 1
+                if col > 4:  # Now allows up to five thumbnails per row
+                    col = 0
+                    row += 2
+
+    # Buttoms 
+    btn_jpg = ttk.Button(thumbnails_window, text="JPG", command=lambda: display_thumbnails([".jpg"]))
+    btn_jpg.pack(side='left', padx=10, pady=10)
+
+    btn_jpeg = ttk.Button(thumbnails_window, text="JPEG", command=lambda: display_thumbnails([".jpeg"]))
+    btn_jpeg.pack(side='left', padx=10, pady=10)
+
+    btn_png = ttk.Button(thumbnails_window, text="PNG", command=lambda: display_thumbnails([".png"]))
+    btn_png.pack(side='left', padx=10, pady=10)
+
+    btn_all = ttk.Button(thumbnails_window, text="All", command=lambda: display_thumbnails([".jpg", ".jpeg", ".png"]))
+    btn_all.pack(side='left', padx=10, pady=10)
+
+   
+#%%    
+# Vytvorenie hlavného okna
+root = tk.Tk()
+root.title("Main menu")
+root.geometry("300x150")
+
+# Vytvorenie rámca pre hlavné menu
+main_menu_frame = ttk.Frame(root)
+main_menu_frame.pack(padx=10, pady=10)
+
+# Tlačidlo pre obrázky
+images_button = ttk.Button(main_menu_frame, text="Images", command=open_image_options_window)
+images_button.grid(row=0, column=0, pady=5)
+
+# Tlačidlo pre slideshow
+slideshow_button = ttk.Button(main_menu_frame, text="Slideshow", command=slideshow_command)
+slideshow_button.grid(row=1, column=0, pady=5)
+
+# Tlačidlo pre thumbnails
+thumbnails_button = ttk.Button(main_menu_frame, text="Thumbnails", command=thumbnails_command)
+thumbnails_button.grid(row=2, column=0, pady=5)
+
+#slučka ukončenie 
+root.mainloop()
